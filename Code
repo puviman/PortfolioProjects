@@ -1,0 +1,136 @@
+
+--SELECT THE DATA THAT WE ARE GOING TO BE USED
+
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+ORDER BY 1,2
+
+
+--TOTAL_CASES VS TOTAL_DEATH 
+--DETH_PERCENTAGE IN SRILANKA
+
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases) * 100 AS Death_percentage
+FROM Portfolio_project..CovidDeaths
+where location like '%sri%' and continent is not null
+ORDER BY 1,2
+
+
+--POPULATION VS TOTAL_CASE
+--PERCENTAGE OF POPULATION GOT COVID IN SRILANKA
+
+SELECT location, date,population, total_cases, (total_cases / population) * 100 AS Infected_percentage
+FROM Portfolio_project..CovidDeaths
+where location like '%sri%' and continent is not null
+ORDER BY 1,2
+
+
+--COUNTRIES WITH HIGHEST INFECTED CONT PER POPULATION
+
+SELECT location, population, max(total_cases) AS Highest_Infected_count, max((total_cases / population)) * 100 AS Highest_Infected_percentage
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+GROUP BY location, population 
+ORDER BY Highest_Infected_percentage DESC
+
+
+--COUNTRIES WITH HIGHEST DEATH COUNT PER POPULATION
+
+SELECT location, max(CAST(total_deaths AS INT)) AS Highest_Death_count
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+GROUP BY location 
+ORDER BY Highest_Death_count DESC
+
+
+--CONTENENT WITH HIGHEST DEATH COUNT PER POPULATION
+
+SELECT continent, max(CAST(total_deaths AS INT)) AS Highest_Death_count
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+GROUP BY continent 
+ORDER BY Highest_Death_count DESC
+
+
+--TOTAL_CASES VS TOTAL_DEATH ACCROSS THE WORLD PER DAY
+
+SELECT date, SUM(new_cases) AS WORLD_WIDE_CASES,SUM(CAST(new_deaths AS INT)) AS WORLD_WIDE_DEATH, (SUM(CAST(new_deaths AS INT)) / SUM(new_cases) ) * 100 AS WORLD_WIDE_DEATH_PERCENTAGE
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+GROUP BY date
+ORDER BY 1,2
+
+
+--TOTAL_CASES VS TOTAL_DEATH ACCROSS THE WORLD 
+
+SELECT SUM(new_cases) AS WORLD_WIDE_CASES,SUM(CAST(new_deaths AS INT)) AS WORLD_WIDE_DEATH, (SUM(CAST(new_deaths AS INT)) / SUM(new_cases) ) * 100 AS WORLD_WIDE_DEATH_PERCENTAGE
+FROM Portfolio_project..CovidDeaths
+where continent is not null
+--GROUP BY date
+ORDER BY 1,2
+
+
+--TOTAL_POPULATION VS VACCINATIONS
+
+SELECT D.continent, D.location, D.date, D.population, V.new_vaccinations, 
+       SUM(CAST(V.new_vaccinations AS INT)) OVER (PARTITION BY D.location ORDER BY D.location, D.date) AS ROLLING_PEOPLE_VACCINATED
+FROM Portfolio_project..CovidDeaths AS D
+JOIN Portfolio_project..CovidVaccinations AS V
+    ON D.location = V.location
+	AND D.date = V.date
+where D.continent is not null
+ORDER BY 2,3
+
+
+--USE CTE
+
+WITH POPVSVACC ( Continent, Location, Date, Population, New_Vaccinations, ROLLING_PEOPLE_VACCINATED)
+as
+(
+SELECT D.continent, D.location, D.date, D.population, V.new_vaccinations, 
+       SUM(CAST(V.new_vaccinations AS INT)) OVER (PARTITION BY D.location ORDER BY D.location, D.date) AS ROLLING_PEOPLE_VACCINATED
+FROM Portfolio_project..CovidDeaths AS D
+JOIN Portfolio_project..CovidVaccinations AS V
+    ON D.location = V.location
+	AND D.date = V.date
+where D.continent is not null
+--ORDER BY 2,3
+)
+SELECT *,( ROLLING_PEOPLE_VACCINATED / Population) * 100
+FROM POPVSVACC
+
+
+--TEM_TABLE
+
+DROP TABLE IF EXISTS PERCENTAGE_POPULATION_VACCINATED
+CREATE TABLE PERCENTAGE_POPULATION_VACCINATED
+( Continent NVARCHAR(255), Location NVARCHAR(255), Date DATETIME, Population NUMERIC, New_Vaccinations NUMERIC, ROLLING_PEOPLE_VACCINATED NUMERIC )
+
+INSERT INTO PERCENTAGE_POPULATION_VACCINATED
+SELECT D.continent, D.location, D.date, D.population, V.new_vaccinations, 
+       SUM(CAST(V.new_vaccinations AS INT)) OVER (PARTITION BY D.location ORDER BY D.location, D.date) AS ROLLING_PEOPLE_VACCINATED
+FROM Portfolio_project..CovidDeaths AS D
+JOIN Portfolio_project..CovidVaccinations AS V
+    ON D.location = V.location
+	AND D.date = V.date
+--where D.continent is not null
+--ORDER BY 2,3
+
+SELECT *,( ROLLING_PEOPLE_VACCINATED / Population) * 100
+FROM PERCENTAGE_POPULATION_VACCINATED
+
+
+--CREAT VIEW TO STORE FOR LATER VISUALIZATION
+
+CREATE VIEW PERCENTAGE_POPULATION_VACCINATED_V AS
+SELECT D.continent, D.location, D.date, D.population, V.new_vaccinations, 
+       SUM(CAST(V.new_vaccinations AS INT)) OVER (PARTITION BY D.location ORDER BY D.location, D.date) AS ROLLING_PEOPLE_VACCINATED
+FROM Portfolio_project..CovidDeaths AS D
+JOIN Portfolio_project..CovidVaccinations AS V
+    ON D.location = V.location
+	AND D.date = V.date
+where D.continent is not null
+--ORDER BY 2,3
+
+SELECT * 
+FROM PERCENTAGE_POPULATION_VACCINATED_V 
